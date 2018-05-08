@@ -118,11 +118,15 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
  if(meas_package.sensor_type_==MeasurementPackage::LASER){
    UpdateLidar(meas_package);
  }
- else if(meas_package.sensor_type_==MeasurementPackage::RADAR){
+ else {
    UpdateRadar(meas_package);
  }
 }
 
+void in2pi(double &yaw){
+    while (yaw> M_PI) yaw-=2.*M_PI;
+    while (yaw<-M_PI) yaw+=2.*M_PI;
+}
 /**
  * Predicts sigma points, the state, and the state covariance matrix.
  * @param {double} delta_t the change in time (in seconds) between the last
@@ -167,6 +171,8 @@ void UKF::Prediction(double delta_t) {
   {
     Xsig_aug.col(i+1)        = x_aug + sqrt(lambda_+n_aug_) * L.col(i);
     Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_+n_aug_) * L.col(i);
+    in2pi(Xsig_aug(3,i+1));
+    in2pi(Xsig_aug(3,i+1+n_aug_));
   }
  cout<<"Create Aumented Sigma Points"<<endl;
   /********************************/
@@ -212,6 +218,10 @@ void UKF::Prediction(double delta_t) {
     yaw_p = yaw_p + 0.5*nu_yawdd*delta_t*delta_t;
     yawd_p = yawd_p + nu_yawdd*delta_t;
 
+ cout<<"Predict sigma B yaw_p="<<yaw_p<<"yaw="<<yaw<<"yawd="<<yawd<<endl;
+    in2pi(yaw_p);
+ cout<<"Predict sigma E yaw_p="<<yaw_p<<"yaw="<<yaw<<endl;
+
     //write predicted sigma point into right column
     Xsig_pred_(0,i) = px_p;
     Xsig_pred_(1,i) = py_p;
@@ -244,7 +254,7 @@ void UKF::Prediction(double delta_t) {
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
- cout<<"Predict mean and covariance B x_="<<x_(3)<<"x_diff="<<x_diff(3)<<endl;
+ cout<<"Predict mean and covariance B x_="<<x_(3)<<"Xsig_pred_.col(i)="<<Xsig_pred_(3,i)<<"x_diff="<<x_diff(3)<<endl;
     while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
     while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
  cout<<"Predict mean and covariance E while="<<x_diff(3)<<endl;
@@ -288,6 +298,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   /********************************/
   const Eigen::VectorXd &z=meas_package.raw_measurements_;
   int n_z=z.size();
+  cout<<"Update Radar"<<endl;
 cout<<"n_z="<<n_z<<endl;
   //create matrix for sigma points in measurement space
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
@@ -316,6 +327,10 @@ cout<<"n_z="<<n_z<<endl;
   for (int i=0; i < 2*n_aug_+1; i++) {
       z_pred = z_pred + weights_(i) * Zsig.col(i);
   }
+
+  cout<<"B z_pred="<<z_pred(1)<<endl;
+  in2pi(z_pred(1));
+  cout<<"E z_pred="<<z_pred(1)<<endl;
 
   //innovation covariance matrix S
   MatrixXd S = MatrixXd(n_z,n_z);
@@ -376,7 +391,5 @@ cout<<"n_z="<<n_z<<endl;
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   P_ = P_ - K*S*K.transpose();
-  cout<<"Update Radar"<<endl;
-
-
+  cout<<"Updated Radar"<<endl;
 }
