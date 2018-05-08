@@ -57,6 +57,16 @@ UKF::UKF() {
   Hint: one or more values initialized above might be wildly off...
   */
   lambda_=3-n_aug_;
+  //create vector for weights
+  weights_ = VectorXd(2*n_aug_+1);
+  // set weights
+  double weight_0 = lambda_/(lambda_+n_aug_);
+  weights_(0) = weight_0;
+  for (int i=1; i<2*n_aug_+1; i++) {  //2n+1 weights
+    double weight = 0.5/(n_aug_+lambda_);
+    weights_(i) = weight;
+  }
+ cout<<"set weights"<<weights_<<endl;
 }
 
 UKF::~UKF() {}
@@ -212,23 +222,13 @@ void UKF::Prediction(double delta_t) {
  cout<<"Predict Sigma Points"<<endl;
   /********************************/
   /*  Predict mean and covariance */
-  /********************************/
-  //create vector for weights
-  weights_ = VectorXd(2*n_aug_+1);
-  
+  /********************************/ 
   //create vector for predicted state
   x_ = VectorXd(n_x_);
 
   //create covariance matrix for prediction
   P_ = MatrixXd(n_x_, n_x_);
-  // set weights
-  double weight_0 = lambda_/(lambda_+n_aug_);
-  weights_(0) = weight_0;
-  for (int i=1; i<2*n_aug_+1; i++) {  //2n+1 weights
-    double weight = 0.5/(n_aug_+lambda_);
-    weights_(i) = weight;
-  }
- cout<<"set weights"<<endl;
+
 
   //predicted state mean
   x_.fill(0.0);
@@ -244,10 +244,10 @@ void UKF::Prediction(double delta_t) {
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
- cout<<"Predict mean and covariance B while="<<x_diff<<endl;
+ cout<<"Predict mean and covariance B x_="<<x_(3)<<"x_diff="<<x_diff(3)<<endl;
     while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
     while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
- cout<<"Predict mean and covariance E while="<<x_diff<<endl;
+ cout<<"Predict mean and covariance E while="<<x_diff(3)<<endl;
 
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose() ;
   }
@@ -288,6 +288,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   /********************************/
   const Eigen::VectorXd &z=meas_package.raw_measurements_;
   int n_z=z.size();
+cout<<"n_z="<<n_z<<endl;
   //create matrix for sigma points in measurement space
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
 
@@ -350,14 +351,14 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     //residual
     VectorXd z_diff = Zsig.col(i) - z_pred;
     //angle normalization
-    //while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
-    //while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
+    while (z_diff(1)> M_PI) z_diff(1)-=2.*M_PI;
+    while (z_diff(1)<-M_PI) z_diff(1)+=2.*M_PI;
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    //while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
-    //while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
