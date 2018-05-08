@@ -27,10 +27,10 @@ UKF::UKF() {
   P_ = MatrixXd(n_x_, n_x_);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 1.5;//30;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 0.9;//30;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -66,7 +66,7 @@ UKF::UKF() {
     double weight = 0.5/(n_aug_+lambda_);
     weights_(i) = weight;
   }
- cout<<"set weights"<<weights_<<endl;
+ cout<<"set weights="<<weights_<<endl;
 }
 
 UKF::~UKF() {}
@@ -84,6 +84,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   */
 
  if (!is_initialized_){
+   P_ = P_.Identity(n_x_, n_x_);
    if(meas_package.sensor_type_==MeasurementPackage::LASER){
      //set the state with the initial location and zero velocity
       x_ << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0,0;
@@ -167,12 +168,13 @@ void UKF::Prediction(double delta_t) {
 
   //create augmented sigma points
   Xsig_aug.col(0)  = x_aug;
+  //in2pi(Xsig_aug(3,0));
   for (int i = 0; i< n_aug_; i++)
   {
     Xsig_aug.col(i+1)        = x_aug + sqrt(lambda_+n_aug_) * L.col(i);
     Xsig_aug.col(i+1+n_aug_) = x_aug - sqrt(lambda_+n_aug_) * L.col(i);
-    in2pi(Xsig_aug(3,i+1));
-    in2pi(Xsig_aug(3,i+1+n_aug_));
+    //in2pi(Xsig_aug(3,i+1));
+    //in2pi(Xsig_aug(3,i+1+n_aug_));
   }
  cout<<"Create Aumented Sigma Points"<<endl;
   /********************************/
@@ -219,7 +221,7 @@ void UKF::Prediction(double delta_t) {
     yawd_p = yawd_p + nu_yawdd*delta_t;
 
  cout<<"Predict sigma B yaw_p="<<yaw_p<<"yaw="<<yaw<<"yawd="<<yawd<<endl;
-    in2pi(yaw_p);
+    //in2pi(yaw_p);
  cout<<"Predict sigma E yaw_p="<<yaw_p<<"yaw="<<yaw<<endl;
 
     //write predicted sigma point into right column
@@ -234,10 +236,10 @@ void UKF::Prediction(double delta_t) {
   /*  Predict mean and covariance */
   /********************************/ 
   //create vector for predicted state
-  x_ = VectorXd(n_x_);
+  //x_ = VectorXd(n_x_);
 
   //create covariance matrix for prediction
-  P_ = MatrixXd(n_x_, n_x_);
+  //P_ = MatrixXd(n_x_, n_x_);
 
 
   //predicted state mean
@@ -245,23 +247,24 @@ void UKF::Prediction(double delta_t) {
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //iterate over sigma points
     x_ = x_+ weights_(i) * Xsig_pred_.col(i);
   }
-
+  //in2pi(x_(3));
  cout<<"predicted state mean"<<endl;
   //predicted state covariance matrix
   P_.fill(0.0);
   for (int i = 0; i < 2 * n_aug_ + 1; i++) {  //iterate over sigma points
-
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
     //angle normalization
- cout<<"Predict mean and covariance B x_="<<x_(3)<<"Xsig_pred_.col(i)="<<Xsig_pred_(3,i)<<"x_diff="<<x_diff(3)<<endl;
+ //cout<<"Predict mean and covariance B x_="<<x_(3)<<"Xsig_pred_.col(i)="<<Xsig_pred_(3,i)<<"x_diff="<<x_diff(3)<<endl;
     while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
     while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
- cout<<"Predict mean and covariance E while="<<x_diff(3)<<endl;
+ //cout<<"Predict mean and covariance E while="<<x_diff(3)<<endl;
 
     P_ = P_ + weights_(i) * x_diff * x_diff.transpose() ;
   }
- cout<<"Predict mean and covariance end"<<endl;
+ cout<<"Mean and cov "<<endl<<x_<<endl<<P_<<endl;
+ //cout<<"Predict mean and covariance end"<<endl;
 }
 
 /**
@@ -277,7 +280,36 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
   */
- cout<<"UpdateLidar"<<endl;
+ cout<<"Update Lidar"<<endl;
+  // initializing matrices
+  MatrixXd R_ = MatrixXd(2, 2);
+  MatrixXd H_ = MatrixXd(2, 5);
+
+  //measurement covariance matrix - laser
+  R_ << std_laspx_*std_laspx_,          0,
+              0              , std_laspy_*std_laspy_;
+  
+  /**
+  TODO:
+    * Finish initializing the FusionEKF.
+    * Set the process and measurement noises
+  */
+  H_  << 1, 0, 0, 0, 0,
+         0, 1, 0, 0, 0;
+  const Eigen::VectorXd &z=meas_package.raw_measurements_;
+  cout <<"z="<< z.size()<<endl;
+  VectorXd y = z - H_ * x_;
+  MatrixXd Ht = H_.transpose();
+  MatrixXd S = H_ * P_ * Ht + R_;
+  MatrixXd Si = S.inverse();
+  MatrixXd K =  P_ * Ht * Si;
+  //new state
+  x_ = x_ + (K * y);
+  //in2pi(x_(3));
+  long x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
+  P_ = (I - K * H_) * P_;
+ cout<<"Updated Lidar "<<endl<<x_<<endl<<P_<<endl;
 }
 
 /**
